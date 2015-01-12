@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LabelOverlapHandling</title>
+</head>
+<script src="basicMath.js"></script>
+<script>
+    var points = [{x: 639.1666666666666, y: 551.176},
+                  {x: 255.66666666666663, y: 571.4639999999999},
+                  {x: 127.83333333333331, y: 700.8},
+                  {x: 127.83333333333331, y: 168.24},
+                  {x: 127.83333333333331, y: 182.18800000000005},
+                  {x: 511.33333333333326, y: 307.71999999999997},
+                  {x: 639.1666666666666, y: 377.46000000000004},
+                  {x: 127.83333333333331, y: 574},
+                  {x: 127.83333333333331, y: 700.8},
+                  {x: 127.83333333333331, y: 182.18800000000005},
+                  {x: 127.83333333333331, y: 574},
+                  {x: 383.5, y: 377.46000000000004},
+                  {x: 127.83333333333331, y: 700.8},
+                  {x: 127.83333333333331, y: 700.8},
+                  {x: 127.83333333333331, y: 525.816}],
+        cW = 767,
+        cH = 570,
+        labels = [],
+        badLabelIndexes = [],
+        chargedParticles = {},
+        canvas = {},
+        context = {},
+        llCollisions = 0,
+        lbCollisions = 0,
+        BUBBLE_R = 10,
+        LABEL_W = 100,
+        LABEL_H = 50,
+        REPULSION = 0,
+        ATTRACTION = 0,
+        DAMPING   = 0,
+        MIN_DISPLACEMENT = 0.3,
+        ITERATIONS = 1,
+        inspectResults = "Add Valid index",
+        totalDebugData = [];
+
+     function startDrawing() {
+        var i;
+         canvas = document.getElementById("canvas");
+         context =  canvas.getContext("2d");
+         //context.clearRect(0, 0, 500, 500);
+         canvas.width = cW;
+         canvas.height = cH;
+         context.stroke();
+         context.fillStyle = 'rgb(255, 0, 0)';
+         context.font = '16px Arial';
+         for (i=0;i<points.length;i++) {
+            context.beginPath();
+            context.arc(points[i].x, points[i].y, BUBBLE_R, 0, Math.PI * 2, true);
+            context.closePath();
+            context.fillText(i.toString(), points[i].x + BUBBLE_R + 3, points[i].y);
+            context.fill()
+            totalDebugData.push(" ");
+        }
+     }
+    function applyForces() {
+       var l=0;
+        REPULSION        = document.getElementById("txtRepulsion").value;
+        DAMPING          = document.getElementById("txtDamping").value;
+        MIN_DISPLACEMENT = document.getElementById("txtMinD").value;
+        ITERATIONS       = document.getElementById("txtIterations").value;
+        ATTRACTION       = document.getElementById("txtAttraction").value;
+       chargedParticles =  {bubbles:[], labels:[]};
+       createChargedParticles();
+       for(l=0;l<ITERATIONS && badLabelIndexes.length>0;l++) {
+           totalDebugData = [];
+           tagLabelOnLabels();
+           applyColumbsLaw(chargedParticles.labels);  //Label to label repulsions
+           applyColumbsLaw(chargedParticles.bubbles); //label to other bubbles repulsions
+           applyBoundaryColumbsLaw();
+           applyAttractionForce();
+           updateVelocities();
+           updatePositions();
+           detectLabelToLabelCollisions();
+           detectLabelTOBubbleCollisions();
+           if((l+1) % 100 === 0) { //Every 100 iterations, adjust the attraction force
+              ATTRACTION = Math.max(ATTRACTION - 0.005 * (l+1) / 100, 0.005);
+              document.getElementById("txtAttraction").value = ATTRACTION;
+           }
+       }
+       startDrawing();
+       drawLabels();
+    }
+    function drawLabels() {
+        //First put label top left corner at bubble's right top
+        if (labels.length === 0) {
+            for (i=0;i<points.length;i++) {
+                labels.push({x:points[i].x + BUBBLE_R + 3, y:points[i].y - BUBBLE_R});
+                badLabelIndexes.push(i);
+            }
+        }
+        //Draw
+        context.strokeStyle = 'rgb(0,0,0)';
+        for (i=0; i<labels.length; i++) {
+            context.beginPath();
+            context.rect(labels[i].x, labels[i].y, LABEL_W, LABEL_H);
+            context.closePath();
+            context.stroke();
+        }
+        //Draw line to bubble
+        for (i=0; i<labels.length; i++) {
+            context.moveTo(points[i].x, points[i].y);
+            context.lineTo(labels[i].x, labels[i].y);
+            context.closePath();
+            context.stroke();
+        }
+        detectLabelToLabelCollisions();
+        detectLabelTOBubbleCollisions();
+        inspectForces();
+    }
+    function inspectForces() {
+        if(isNaN(document.getElementById('txtIndex').value) ||
+           !totalDebugData[document.getElementById('txtIndex').value]) {
+            inspectResults = "Enter Valid Index";
+        } else {
+            inspectResults = totalDebugData[document.getElementById('txtIndex').value];
+        }
+        document.getElementById('results').innerHTML = inspectResults;
+    }
+</script>
+<body onload="startDrawing();drawLabels();" style="width:1200px; height:900px">
+<div>
+    <label for="txtRepulsion">Repulsion</label>
+    <input name="repulsion" id="txtRepulsion" value="4000"/>
+    <label for="txtDamping">Damping</label>
+    <input name="repulsion" id="txtDamping" value="0.5"/>
+    <label for="txtMinD">Min dx,dy</label>
+    <input id="txtMinD" value="0.3"/>
+    <br>
+    <label for="txtAttraction">  Attraction:</label>
+    <input id="txtAttraction" value="0.1"/>
+    <label for="txtIterations">  Iterations:</label>
+    <input name="iterations" id="txtIterations" value="1"/>
+    <button onclick="applyForces()">Apply Forces</button>
+    <div id="llCollisions">0</div>
+    <div id="lbCollisions">0</div>
+</div>
+ <div style="float:left; width:1000px; height:800px">
+     <canvas id="canvas" width="500" height="500" style="border: 1px solid black;"/>
+ </div>
+<div>
+    <h4>Force Inspector</h4>
+    <label for="txtIndex">Index</label>
+    <input id="txtIndex"/>
+    <button onclick="inspectForces()">Inspect</button>
+    <div id="results"></div>
+</div>
+</body>
+</html>
